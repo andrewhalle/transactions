@@ -19,4 +19,24 @@ impl Account {
             frozen: false,
         }
     }
+
+    pub fn deposit(&mut self, amount: u64) {
+        self.available += amount as i64;
+        self.total += amount as i64;
+    }
+
+    pub fn withdraw(&mut self, amount: u64) {
+        self.available -= amount as i64;
+        self.total -= amount as i64;
+    }
+
+    pub fn hold(&mut self, amount: i64) {
+        self.available -= amount;
+        self.held += amount;
+    }
+
+    pub fn release(&mut self, amount: i64) {
+        self.available += amount;
+        self.held -= amount;
+    }
 }

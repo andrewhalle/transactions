@@ -36,74 +36,54 @@ pub fn process_one(state: &mut State, transaction: Transaction) {
         Deposit => {
             check_not_exists(&state.transactions, transaction.tx);
             let amount = transaction.amount.expect("deposit must have an amount");
-
-            account.available += amount;
-            account.total += amount;
-
             state.transactions.insert(transaction.tx, transaction);
+
+            account.deposit(amount);
         }
         Withdrawal => {
             check_not_exists(&state.transactions, transaction.tx);
             let amount = transaction.amount.expect("credit must have an amount");
-
-            account.available -= amount;
-            account.total -= amount;
-
             state.transactions.insert(transaction.tx, transaction);
+
+            account.withdraw(amount);
         }
         Dispute => {
             let disputed_transaction = state
                 .transactions
                 .get_mut(&transaction.tx)
                 .expect("disputed transaction does not exist");
-
-            let amount = disputed_transaction.amount.expect("must have amount");
-            match disputed_transaction.r#type {
-                Deposit => {
-                    account.available -= amount;
-                    account.held += amount;
-                }
-                Withdrawal => {
-                    account.available += amount;
-                    account.held -= amount;
-                }
-                _ => unreachable!(),
-            };
-
             disputed_transaction.disputed = true;
+
+            let mut amount = disputed_transaction.amount.expect("must have amount") as i64;
+            if let Withdrawal = disputed_transaction.r#type {
+                amount *= -1;
+            }
+
+            account.hold(amount);
         }
         Resolve => {
             let disputed_transaction = state
                 .transactions
                 .get_mut(&transaction.tx)
                 .expect("disputed transaction does not exist");
-
             if !disputed_transaction.disputed {
                 // TODO: don't panic
                 panic!("transaction not disputed");
             }
-
-            let amount = disputed_transaction.amount.expect("must have amount");
-            match disputed_transaction.r#type {
-                Deposit => {
-                    account.available += amount;
-                    account.held -= amount;
-                }
-                Withdrawal => {
-                    account.available -= amount;
-                    account.held += amount;
-                }
-                _ => unreachable!(),
-            };
-
             disputed_transaction.disputed = false;
+
+            let mut amount = disputed_transaction.amount.expect("must have amount") as i64;
+            if let Withdrawal = disputed_transaction.r#type {
+                amount *= -1;
+            }
+
+            account.release(amount);
         }
         Chargeback => {
             let disputed_transaction = state
                 .transactions
                 .get(&transaction.tx)
                 .expect("disputed transaction does not exist");
-
             if !disputed_transaction.disputed {
                 // TODO: don't panic
                 panic!("transaction not disputed");
@@ -111,16 +91,10 @@ pub fn process_one(state: &mut State, transaction: Transaction) {
 
             let amount = disputed_transaction.amount.expect("must have amount");
             match disputed_transaction.r#type {
-                Deposit => {
-                    account.held -= amount;
-                    account.total -= amount;
-                }
-                Withdrawal => {
-                    account.held += amount;
-                    account.total += amount;
-                }
+                Deposit => account.withdraw(amount),
+                Withdrawal => account.deposit(amount),
                 _ => unreachable!(),
-            };
+            }
 
             account.frozen = true;
         }
