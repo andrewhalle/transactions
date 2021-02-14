@@ -1,13 +1,14 @@
 use serde::{Deserialize, Deserializer};
 
-fn money_string_to_u64(s: String) -> u64 {
+fn money_string_to_i64(s: String) -> i64 {
     let mut pieces = s.split(".");
 
     let whole = pieces.next().expect("expected chunk separated by .");
-    let whole = whole.parse::<u64>().expect("could not parse integer");
+    let whole = whole.parse::<i64>().expect("could not parse integer");
 
+    // support no fractional part
     let fractional = pieces.next().expect("expected chunk separated by .");
-    let fractional = fractional.parse::<u64>().expect("could not parse integer");
+    let fractional = fractional.parse::<i64>().expect("could not parse integer");
 
     if pieces.next().is_some() {
         // TODO: don't panic
@@ -22,10 +23,10 @@ fn money_string_to_u64(s: String) -> u64 {
     (whole * 10000) + fractional
 }
 
-fn amount_deserializer<'de, D: Deserializer<'de>>(d: D) -> Result<Option<u64>, D::Error> {
+fn amount_deserializer<'de, D: Deserializer<'de>>(d: D) -> Result<Option<i64>, D::Error> {
     let buf = Option::<String>::deserialize(d)?;
 
-    Ok(buf.map(money_string_to_u64))
+    Ok(buf.map(money_string_to_i64))
 }
 
 #[derive(Debug, Deserialize)]
@@ -57,8 +58,7 @@ pub struct Transaction {
     // would consider using fixed-point if needed to do anything more complex than adding and
     // subtracting
     #[serde(deserialize_with = "amount_deserializer")]
-    pub amount: Option<u64>,
+    pub amount: Option<i64>,
     pub client: u16,
-    #[serde(rename = "tx")]
-    pub id: u32,
+    pub tx: u32,
 }

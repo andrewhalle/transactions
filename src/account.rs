@@ -3,8 +3,9 @@ use serde::Serialize;
 #[derive(Debug, Serialize)]
 pub struct Account {
     pub id: u16,
-    pub available: u64,
-    pub held: u64,
+    pub available: i64,
+    pub held: i64,
+    pub total: i64,
     pub frozen: bool,
 }
 
@@ -14,6 +15,7 @@ impl Account {
             id,
             available: 0,
             held: 0,
+            total: 0,
             frozen: false,
         }
     }
