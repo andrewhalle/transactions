@@ -54,7 +54,7 @@ pub fn process_one(state: &mut State, transaction: Transaction) {
         Dispute => {
             let disputed_transaction = state
                 .transactions
-                .get(&transaction.tx)
+                .get_mut(&transaction.tx)
                 .expect("disputed transaction does not exist");
 
             let amount = disputed_transaction.amount.expect("must have amount");
@@ -69,12 +69,19 @@ pub fn process_one(state: &mut State, transaction: Transaction) {
                 }
                 _ => unreachable!(),
             };
+
+            disputed_transaction.disputed = true;
         }
         Resolve => {
             let disputed_transaction = state
                 .transactions
-                .get(&transaction.tx)
+                .get_mut(&transaction.tx)
                 .expect("disputed transaction does not exist");
+
+            if !disputed_transaction.disputed {
+                // TODO: don't panic
+                panic!("transaction not disputed");
+            }
 
             let amount = disputed_transaction.amount.expect("must have amount");
             match disputed_transaction.r#type {
@@ -88,12 +95,19 @@ pub fn process_one(state: &mut State, transaction: Transaction) {
                 }
                 _ => unreachable!(),
             };
+
+            disputed_transaction.disputed = false;
         }
         Chargeback => {
             let disputed_transaction = state
                 .transactions
                 .get(&transaction.tx)
                 .expect("disputed transaction does not exist");
+
+            if !disputed_transaction.disputed {
+                // TODO: don't panic
+                panic!("transaction not disputed");
+            }
 
             let amount = disputed_transaction.amount.expect("must have amount");
             match disputed_transaction.r#type {

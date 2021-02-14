@@ -61,4 +61,11 @@ pub struct Transaction {
     pub amount: Option<i64>,
     pub client: u16,
     pub tx: u32,
+    #[serde(skip_deserializing, default = "bool_false")]
+    pub disputed: bool,
+}
+
+// serde requires a function for default values, can't use a literal
+const fn bool_false() -> bool {
+    false
 }
