@@ -1,39 +1,52 @@
 use serde::{Deserialize, Deserializer};
 use thiserror::Error;
 
-fn money_string_to_u64(s: String) -> u64 {
+fn money_string_to_u64(s: String) -> Result<u64, TransactionError> {
     let mut pieces = s.split(".");
 
-    let whole = pieces.next().expect("expected chunk separated by .");
-    let whole = whole.parse::<u64>().expect("could not parse integer");
+    let whole = pieces.next().ok_or(TransactionAmountImproperlyFormatted)?;
+    let whole = whole
+        .parse::<u64>()
+        .ok()
+        .ok_or(TransactionAmountImproperlyFormatted)?;
 
     // support no fractional part
-    let fractional = pieces.next().expect("expected chunk separated by .");
-    let fractional = fractional.parse::<u64>().expect("could not parse integer");
+    let fractional = pieces.next().ok_or(TransactionAmountImproperlyFormatted)?;
+    let fractional = fractional
+        .parse::<u64>()
+        .ok()
+        .ok_or(TransactionAmountImproperlyFormatted)?;
 
     if pieces.next().is_some() {
-        // TODO: don't panic
-        panic!("too many .");
+        return Err(TransactionAmountImproperlyFormatted);
     }
 
     if fractional > 9999 {
-        // TODO: don't panic
-        panic!("too large a fractional part");
+        return Err(TransactionAmountImproperlyFormatted);
     }
 
-    (whole * 10000) + fractional
+    Ok((whole * 10000) + fractional)
 }
 
 fn amount_deserializer<'de, D: Deserializer<'de>>(d: D) -> Result<Option<u64>, D::Error> {
-    let buf = Option::<String>::deserialize(d)?;
+    let buf = String::deserialize(d)?;
 
-    Ok(buf.map(money_string_to_u64))
+    if buf == "" {
+        Ok(None)
+    } else {
+        // TODO: remove this expect
+        let money_result = money_string_to_u64(buf).expect("improperly formatted");
+
+        Ok(Some(money_result))
+    }
 }
 
 #[derive(Debug, Error)]
 pub enum TransactionError {
     #[error("transaction needs amount")]
     TransactionNeedsAmount,
+    #[error("transaction amount improperly formatted")]
+    TransactionAmountImproperlyFormatted,
 }
 use TransactionError::*;
 

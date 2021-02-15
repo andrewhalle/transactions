@@ -7,7 +7,7 @@ use transactions::Transaction;
 fn main() {
     // open the input file
     let mut args = env::args();
-    args.next().expect("first args is executable name");
+    args.next().expect("first arg is executable name");
     let filename = args.next().expect("no filename provided");
     let f = File::open(filename).expect("could not open file");
     // TODO: do I need to buffer?
@@ -19,7 +19,10 @@ fn main() {
     let mut rdr = csv::Reader::from_reader(f);
     for result in rdr.deserialize() {
         let t: Transaction = result.expect("could not get transaction");
-        process::process_one(&mut state, t).expect("failed processing");
+        match process::process_one(&mut state, t) {
+            Ok(_) => {}
+            Err(_) => { /* handle the error as desired */ }
+        }
     }
 
     // print output to stdout
