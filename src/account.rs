@@ -23,6 +23,7 @@ fn i64_as_money_string<S: Serializer>(val: &i64, s: S) -> Result<S::Ok, S::Error
 
 #[derive(Debug, Serialize)]
 pub struct Account {
+    #[serde(rename = "client")]
     pub id: u16,
     #[serde(serialize_with = "i64_as_money_string")]
     pub available: i64,
