@@ -10,12 +10,13 @@ fn money_string_to_u64(s: String) -> Result<u64, TransactionError> {
         .ok()
         .ok_or(TransactionAmountImproperlyFormatted)?;
 
-    // support no fractional part
-    let fractional = pieces.next().ok_or(TransactionAmountImproperlyFormatted)?;
-    let fractional = fractional
-        .parse::<u64>()
-        .ok()
-        .ok_or(TransactionAmountImproperlyFormatted)?;
+    let mut fractional = 0;
+    if let Some(piece) = pieces.next() {
+        fractional = piece
+            .parse::<u64>()
+            .ok()
+            .ok_or(TransactionAmountImproperlyFormatted)?;
+    }
 
     if pieces.next().is_some() {
         return Err(TransactionAmountImproperlyFormatted);
