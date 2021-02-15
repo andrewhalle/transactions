@@ -17,6 +17,12 @@ impl State {
     }
 }
 
+impl Default for State {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum TransactionProcessingError {
     #[error("transaction already processed")]
@@ -46,6 +52,7 @@ fn insert_if_not_exists(
     txns: &mut HashMap<u32, Transaction>,
     t: Transaction,
 ) -> Result<(), TransactionProcessingError> {
+    #[allow(clippy::map_entry)]
     if txns.contains_key(&t.tx) {
         Err(TransactionAlreadyProcessed)
     } else {
@@ -97,7 +104,7 @@ pub fn process_one(
     let account = state
         .accounts
         .entry(transaction.client)
-        .or_insert(Account::new(transaction.client));
+        .or_insert_with(|| Account::new(transaction.client));
 
     match transaction.r#type {
         Deposit => {

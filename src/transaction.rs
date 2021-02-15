@@ -2,7 +2,7 @@ use serde::{Deserialize, Deserializer};
 use thiserror::Error;
 
 fn money_string_to_u64(s: String) -> Result<u64, TransactionError> {
-    let mut pieces = s.split(".");
+    let mut pieces = s.split('.');
 
     let whole = pieces.next().ok_or(TransactionAmountImproperlyFormatted)?;
     let whole = whole
