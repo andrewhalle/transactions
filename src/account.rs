@@ -1,11 +1,34 @@
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use thiserror::Error;
+
+fn i64_as_money_string<S: Serializer>(val: &i64, s: S) -> Result<S::Ok, S::Error> {
+    let mut val = *val;
+
+    let mut negative = false;
+    if val < 0 {
+        negative = true;
+        val *= -1;
+    }
+
+    let whole = val / 10000;
+    let fractional = val % 10000;
+
+    s.serialize_str(&format!(
+        "{}{}.{}",
+        if negative { "-" } else { "" },
+        whole,
+        fractional
+    ))
+}
 
 #[derive(Debug, Serialize)]
 pub struct Account {
     pub id: u16,
+    #[serde(serialize_with = "i64_as_money_string")]
     pub available: i64,
+    #[serde(serialize_with = "i64_as_money_string")]
     pub held: i64,
+    #[serde(serialize_with = "i64_as_money_string")]
     pub total: i64,
     pub frozen: bool,
 }
@@ -48,13 +71,13 @@ impl Account {
         self.total -= amount as i64;
     }
 
-    pub fn hold(&mut self, amount: i64) {
-        self.available -= amount;
-        self.held += amount;
+    pub fn hold(&mut self, amount: u64) {
+        self.available -= amount as i64;
+        self.held += amount as i64;
     }
 
-    pub fn release(&mut self, amount: i64) {
-        self.available += amount;
-        self.held -= amount;
+    pub fn release(&mut self, amount: u64) {
+        self.available += amount as i64;
+        self.held -= amount as i64;
     }
 }

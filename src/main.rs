@@ -19,7 +19,7 @@ fn main() {
     let mut rdr = csv::Reader::from_reader(f);
     for result in rdr.deserialize() {
         let t: Transaction = result.expect("could not get transaction");
-        process::process_one(&mut state, t);
+        process::process_one(&mut state, t).expect("failed processing");
     }
 
     // print output to stdout

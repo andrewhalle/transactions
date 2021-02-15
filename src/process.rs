@@ -115,32 +115,33 @@ pub fn process_one(
         Dispute => {
             let disputed_transaction =
                 get_undisputed_transaction(&mut state.transactions, transaction.tx)?;
-            disputed_transaction.disputed = true;
+            let amount = disputed_transaction.amount()?;
 
-            let mut amount = disputed_transaction.amount()? as i64;
-            if let Withdrawal = disputed_transaction.r#type {
-                amount *= -1;
+            if let Deposit = disputed_transaction.r#type {
+                account.hold(amount);
+            } else {
+                account.release(amount);
             }
-
-            account.hold(amount);
+            disputed_transaction.disputed = true;
         }
         Resolve => {
             let disputed_transaction =
                 get_disputed_transaction(&mut state.transactions, transaction.tx)?;
             disputed_transaction.disputed = false;
 
-            let mut amount = disputed_transaction.amount()? as i64;
-            if let Withdrawal = disputed_transaction.r#type {
-                amount *= -1;
+            let amount = disputed_transaction.amount()?;
+            if let Deposit = disputed_transaction.r#type {
+                account.release(amount);
+            } else {
+                account.hold(amount);
             }
-
-            account.release(amount);
         }
         Chargeback => {
             let disputed_transaction =
                 get_disputed_transaction(&mut state.transactions, transaction.tx)?;
 
             let amount = disputed_transaction.amount()?;
+            account.release(amount);
             match disputed_transaction.r#type {
                 Deposit => account.force_withdraw(amount),
                 Withdrawal => account.deposit(amount),
