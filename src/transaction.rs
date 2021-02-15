@@ -12,7 +12,8 @@ fn money_string_to_u64(s: String) -> Result<u64, TransactionError> {
 
     let mut fractional = 0;
     if let Some(piece) = pieces.next() {
-        fractional = piece
+        let padded = format!("{:0<4}", piece);
+        fractional = padded
             .parse::<u64>()
             .ok()
             .ok_or(TransactionAmountImproperlyFormatted)?;

@@ -17,7 +17,7 @@ fn i64_as_money_string<S: Serializer>(val: &i64, s: S) -> Result<S::Ok, S::Error
         "{}{}.{}",
         if negative { "-" } else { "" },
         whole,
-        fractional
+        format!("{:0>4}", fractional)
     ))
 }
 
