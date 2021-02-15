@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use thiserror::Error;
 
 use crate::{transaction::TransactionType::*, Account, Transaction};
 
@@ -16,17 +17,83 @@ impl State {
     }
 }
 
-fn check_not_exists(txns: &HashMap<u32, Transaction>, id: u32) {
-    if txns.contains_key(&id) {
-        // this transaction has already been processed
-        // TODO: don't panic
-        panic!("already processed transaction");
+#[derive(Debug, Error)]
+pub enum TransactionProcessingError {
+    #[error("transaction already processed")]
+    TransactionAlreadyProcessed,
+    #[error("transaction requires amount but one was not provided")]
+    TransactionRequiresAmount,
+    #[error("transaction does not exist")]
+    TransactionDoesNotExist,
+    #[error("transaction disputed")]
+    TransactionDisputed,
+    #[error("transaction not disputed")]
+    TransactionNotDisputed,
+    #[error("something went wrong")]
+    TransactionProcessingAccountError {
+        #[from]
+        source: crate::account::AccountError,
+    },
+    #[error("something went wrong")]
+    TransactionProcessingTransactionError {
+        #[from]
+        source: crate::transaction::TransactionError,
+    },
+}
+use TransactionProcessingError::*;
+
+fn insert_if_not_exists(
+    txns: &mut HashMap<u32, Transaction>,
+    t: Transaction,
+) -> Result<(), TransactionProcessingError> {
+    if txns.contains_key(&t.tx) {
+        Err(TransactionAlreadyProcessed)
+    } else {
+        txns.insert(t.tx, t);
+
+        Ok(())
+    }
+}
+
+fn get_transaction(
+    txns: &mut HashMap<u32, Transaction>,
+    id: u32,
+) -> Result<&mut Transaction, TransactionProcessingError> {
+    txns.get_mut(&id).ok_or(TransactionDoesNotExist)
+}
+
+fn get_disputed_transaction(
+    txns: &mut HashMap<u32, Transaction>,
+    id: u32,
+) -> Result<&mut Transaction, TransactionProcessingError> {
+    let t = get_transaction(txns, id)?;
+
+    if !t.disputed {
+        Err(TransactionNotDisputed)
+    } else {
+        Ok(t)
+    }
+}
+
+fn get_undisputed_transaction(
+    txns: &mut HashMap<u32, Transaction>,
+    id: u32,
+) -> Result<&mut Transaction, TransactionProcessingError> {
+    let t = get_transaction(txns, id)?;
+
+    if t.disputed {
+        Err(TransactionDisputed)
+    } else {
+        Ok(t)
     }
 }
 
 // designed this way so that if transactions were coming in from multiple sources, I could share
 // the state by putting it in a Mutex
-pub fn process_one(state: &mut State, transaction: Transaction) {
+pub fn process_one(
+    state: &mut State,
+    transaction: Transaction,
+) -> Result<(), TransactionProcessingError> {
     let account = state
         .accounts
         .entry(transaction.client)
@@ -34,27 +101,23 @@ pub fn process_one(state: &mut State, transaction: Transaction) {
 
     match transaction.r#type {
         Deposit => {
-            check_not_exists(&state.transactions, transaction.tx);
-            let amount = transaction.amount.expect("deposit must have an amount");
-            state.transactions.insert(transaction.tx, transaction);
+            let amount = transaction.amount()?;
+            insert_if_not_exists(&mut state.transactions, transaction)?;
 
             account.deposit(amount);
         }
         Withdrawal => {
-            check_not_exists(&state.transactions, transaction.tx);
-            let amount = transaction.amount.expect("credit must have an amount");
-            state.transactions.insert(transaction.tx, transaction);
+            let amount = transaction.amount()?;
+            insert_if_not_exists(&mut state.transactions, transaction)?;
 
-            account.withdraw(amount);
+            account.withdraw(amount)?;
         }
         Dispute => {
-            let disputed_transaction = state
-                .transactions
-                .get_mut(&transaction.tx)
-                .expect("disputed transaction does not exist");
+            let disputed_transaction =
+                get_undisputed_transaction(&mut state.transactions, transaction.tx)?;
             disputed_transaction.disputed = true;
 
-            let mut amount = disputed_transaction.amount.expect("must have amount") as i64;
+            let mut amount = disputed_transaction.amount()? as i64;
             if let Withdrawal = disputed_transaction.r#type {
                 amount *= -1;
             }
@@ -62,17 +125,11 @@ pub fn process_one(state: &mut State, transaction: Transaction) {
             account.hold(amount);
         }
         Resolve => {
-            let disputed_transaction = state
-                .transactions
-                .get_mut(&transaction.tx)
-                .expect("disputed transaction does not exist");
-            if !disputed_transaction.disputed {
-                // TODO: don't panic
-                panic!("transaction not disputed");
-            }
+            let disputed_transaction =
+                get_disputed_transaction(&mut state.transactions, transaction.tx)?;
             disputed_transaction.disputed = false;
 
-            let mut amount = disputed_transaction.amount.expect("must have amount") as i64;
+            let mut amount = disputed_transaction.amount()? as i64;
             if let Withdrawal = disputed_transaction.r#type {
                 amount *= -1;
             }
@@ -80,18 +137,12 @@ pub fn process_one(state: &mut State, transaction: Transaction) {
             account.release(amount);
         }
         Chargeback => {
-            let disputed_transaction = state
-                .transactions
-                .get(&transaction.tx)
-                .expect("disputed transaction does not exist");
-            if !disputed_transaction.disputed {
-                // TODO: don't panic
-                panic!("transaction not disputed");
-            }
+            let disputed_transaction =
+                get_disputed_transaction(&mut state.transactions, transaction.tx)?;
 
-            let amount = disputed_transaction.amount.expect("must have amount");
+            let amount = disputed_transaction.amount()?;
             match disputed_transaction.r#type {
-                Deposit => account.withdraw(amount),
+                Deposit => account.force_withdraw(amount),
                 Withdrawal => account.deposit(amount),
                 _ => unreachable!(),
             }
@@ -99,4 +150,6 @@ pub fn process_one(state: &mut State, transaction: Transaction) {
             account.frozen = true;
         }
     }
+
+    Ok(())
 }

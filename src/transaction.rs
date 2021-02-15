@@ -1,4 +1,5 @@
 use serde::{Deserialize, Deserializer};
+use thiserror::Error;
 
 fn money_string_to_u64(s: String) -> u64 {
     let mut pieces = s.split(".");
@@ -28,6 +29,13 @@ fn amount_deserializer<'de, D: Deserializer<'de>>(d: D) -> Result<Option<u64>, D
 
     Ok(buf.map(money_string_to_u64))
 }
+
+#[derive(Debug, Error)]
+pub enum TransactionError {
+    #[error("transaction needs amount")]
+    TransactionNeedsAmount,
+}
+use TransactionError::*;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -63,6 +71,12 @@ pub struct Transaction {
     pub tx: u32,
     #[serde(skip_deserializing, default = "bool_false")]
     pub disputed: bool,
+}
+
+impl Transaction {
+    pub fn amount(&self) -> Result<u64, TransactionError> {
+        self.amount.ok_or(TransactionNeedsAmount)
+    }
 }
 
 // serde requires a function for default values, can't use a literal

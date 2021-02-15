@@ -1,4 +1,5 @@
 use serde::Serialize;
+use thiserror::Error;
 
 #[derive(Debug, Serialize)]
 pub struct Account {
@@ -8,6 +9,13 @@ pub struct Account {
     pub total: i64,
     pub frozen: bool,
 }
+
+#[derive(Debug, Error)]
+pub enum AccountError {
+    #[error("not enough available")]
+    NotEnoughAvailable,
+}
+use AccountError::*;
 
 impl Account {
     pub fn new(id: u16) -> Self {
@@ -25,7 +33,17 @@ impl Account {
         self.total += amount as i64;
     }
 
-    pub fn withdraw(&mut self, amount: u64) {
+    pub fn withdraw(&mut self, amount: u64) -> Result<(), AccountError> {
+        if self.available < amount as i64 {
+            Err(NotEnoughAvailable)
+        } else {
+            self.force_withdraw(amount);
+
+            Ok(())
+        }
+    }
+
+    pub fn force_withdraw(&mut self, amount: u64) {
         self.available -= amount as i64;
         self.total -= amount as i64;
     }
