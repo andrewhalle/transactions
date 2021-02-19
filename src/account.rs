@@ -1,6 +1,8 @@
 use serde::{Serialize, Serializer};
 use thiserror::Error;
 
+use crate::transaction::TransactionType;
+
 fn i64_as_money_string(mut val: i64) -> String {
     let mut negative = false;
     if val < 0 {
@@ -69,19 +71,47 @@ impl Account {
         }
     }
 
-    pub fn force_withdraw(&mut self, amount: u64) {
+    fn force_withdraw(&mut self, amount: u64) {
         self.available -= amount as i64;
         self.total -= amount as i64;
     }
 
-    pub fn hold(&mut self, amount: u64) {
+    fn hold(&mut self, amount: u64) {
         self.available -= amount as i64;
         self.held += amount as i64;
     }
 
-    pub fn release(&mut self, amount: u64) {
+    fn release(&mut self, amount: u64) {
         self.available += amount as i64;
         self.held -= amount as i64;
+    }
+
+    pub fn dispute(&mut self, amount: u64, transaction_type: TransactionType) {
+        if let TransactionType::Deposit = transaction_type {
+            self.hold(amount);
+        } else {
+            self.release(amount);
+        }
+    }
+
+    pub fn resolve(&mut self, amount: u64, transaction_type: TransactionType) {
+        if let TransactionType::Deposit = transaction_type {
+            self.release(amount);
+        } else {
+            self.hold(amount);
+        }
+    }
+
+    pub fn chargeback(&mut self, amount: u64, transaction_type: TransactionType) {
+        self.resolve(amount, transaction_type);
+
+        match transaction_type {
+            TransactionType::Deposit => self.force_withdraw(amount),
+            TransactionType::Withdrawal => self.deposit(amount),
+            _ => unreachable!(),
+        }
+
+        self.locked = true;
     }
 }
 

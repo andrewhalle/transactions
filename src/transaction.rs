@@ -48,7 +48,7 @@ pub enum TransactionError {
 }
 use TransactionError::*;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TransactionType {
     Deposit,

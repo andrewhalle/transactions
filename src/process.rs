@@ -134,12 +134,7 @@ pub fn process_one(
             let amount = disputed_transaction.amount()?;
             disputed_transaction.disputed = true;
 
-            // TODO: account.dispute(amount, disputed_transaction.r#type)
-            if let Deposit = disputed_transaction.r#type {
-                account.hold(amount);
-            } else {
-                account.release(amount);
-            }
+            account.dispute(amount, disputed_transaction.r#type)
         }
         Resolve => {
             let disputed_transaction =
@@ -147,33 +142,14 @@ pub fn process_one(
             disputed_transaction.disputed = false;
             let amount = disputed_transaction.amount()?;
 
-            // TODO: account.resolve(amount, disputed_transaction.r#type)
-            if let Deposit = disputed_transaction.r#type {
-                account.release(amount);
-            } else {
-                account.hold(amount);
-            }
+            account.resolve(amount, disputed_transaction.r#type)
         }
         Chargeback => {
             let disputed_transaction =
                 get_disputed_transaction(&mut state.transactions, transaction.tx)?;
             let amount = disputed_transaction.amount()?;
 
-            // TODO: account.chargeback(amount, disputed_transaction.r#type)
-            if let Deposit = disputed_transaction.r#type {
-                account.release(amount);
-            } else {
-                account.hold(amount);
-            }
-
-            match disputed_transaction.r#type {
-                Deposit => account.force_withdraw(amount),
-                Withdrawal => account.deposit(amount),
-                _ => unreachable!(),
-            }
-            // end TODO
-
-            account.locked = true;
+            account.chargeback(amount, disputed_transaction.r#type)
         }
     }
 
