@@ -18,6 +18,11 @@ fn main() {
     // process all transactions
     let mut rdr = csv::Reader::from_reader(f);
     for result in rdr.deserialize() {
+        if result.is_err() {
+            /* handle the error as desired */
+            continue;
+        }
+
         let t: Transaction = result.expect("could not get transaction");
         if process::process_one(&mut state, t).is_err() { /* handle the error as desired */ }
     }

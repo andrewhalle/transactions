@@ -1,3 +1,4 @@
+use serde::de;
 use serde::{Deserialize, Deserializer};
 use thiserror::Error;
 
@@ -7,23 +8,21 @@ fn money_string_to_u64(s: String) -> Result<u64, TransactionError> {
     let whole = pieces.next().ok_or(TransactionAmountImproperlyFormatted)?;
     let whole = whole
         .parse::<u64>()
-        .ok()
-        .ok_or(TransactionAmountImproperlyFormatted)?;
+        .or(Err(TransactionAmountImproperlyFormatted))?;
 
     let mut fractional = 0;
     if let Some(piece) = pieces.next() {
+        if piece.len() > 4 {
+            return Err(TransactionAmountImproperlyFormatted);
+        }
+
         let padded = format!("{:0<4}", piece);
         fractional = padded
             .parse::<u64>()
-            .ok()
-            .ok_or(TransactionAmountImproperlyFormatted)?;
+            .or(Err(TransactionAmountImproperlyFormatted))?;
     }
 
     if pieces.next().is_some() {
-        return Err(TransactionAmountImproperlyFormatted);
-    }
-
-    if fractional > 9999 {
         return Err(TransactionAmountImproperlyFormatted);
     }
 
@@ -36,14 +35,11 @@ fn amount_deserializer<'de, D: Deserializer<'de>>(d: D) -> Result<Option<u64>, D
     if buf == "" {
         Ok(None)
     } else {
-        // TODO: remove this expect
-        let money_result = money_string_to_u64(buf).expect("improperly formatted");
-
-        Ok(Some(money_result))
+        Ok(Some(money_string_to_u64(buf).map_err(de::Error::custom)?))
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, PartialEq, Error)]
 pub enum TransactionError {
     #[error("transaction needs amount")]
     TransactionNeedsAmount,
@@ -97,4 +93,23 @@ impl Transaction {
 // serde requires a function for default values, can't use a literal
 const fn bool_false() -> bool {
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_money_string_to_u64() {
+        assert_eq!(money_string_to_u64("10".to_string()).unwrap(), 100000);
+        assert_eq!(money_string_to_u64("10.".to_string()).unwrap(), 100000);
+        assert_eq!(money_string_to_u64("10.1".to_string()).unwrap(), 101000);
+        assert_eq!(money_string_to_u64("10.01".to_string()).unwrap(), 100100);
+        assert_eq!(money_string_to_u64("10.001".to_string()).unwrap(), 100010);
+        assert_eq!(money_string_to_u64("10.0001".to_string()).unwrap(), 100001);
+        assert_eq!(
+            money_string_to_u64("10.00001".to_string()),
+            Err(TransactionAmountImproperlyFormatted)
+        );
+    }
 }

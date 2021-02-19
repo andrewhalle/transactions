@@ -35,6 +35,8 @@ pub enum TransactionProcessingError {
     TransactionDisputed,
     #[error("transaction not disputed")]
     TransactionNotDisputed,
+    #[error("account locked")]
+    AccountLocked,
     #[error("something went wrong")]
     TransactionProcessingAccountError {
         #[from]
@@ -106,6 +108,10 @@ pub fn process_one(
         .entry(transaction.client)
         .or_insert_with(|| Account::new(transaction.client));
 
+    if account.locked {
+        return Err(AccountLocked);
+    }
+
     match transaction.r#type {
         Deposit => {
             let amount = transaction.amount()?;
@@ -118,25 +124,30 @@ pub fn process_one(
             insert_if_not_exists(&mut state.transactions, transaction)?;
 
             account.withdraw(amount)?;
+
+            // TODO if error occurred, might need to remove the inserted transaction, what if it's
+            // later chargedback?
         }
         Dispute => {
             let disputed_transaction =
                 get_undisputed_transaction(&mut state.transactions, transaction.tx)?;
             let amount = disputed_transaction.amount()?;
+            disputed_transaction.disputed = true;
 
+            // TODO: account.dispute(amount, disputed_transaction.r#type)
             if let Deposit = disputed_transaction.r#type {
                 account.hold(amount);
             } else {
                 account.release(amount);
             }
-            disputed_transaction.disputed = true;
         }
         Resolve => {
             let disputed_transaction =
                 get_disputed_transaction(&mut state.transactions, transaction.tx)?;
             disputed_transaction.disputed = false;
-
             let amount = disputed_transaction.amount()?;
+
+            // TODO: account.resolve(amount, disputed_transaction.r#type)
             if let Deposit = disputed_transaction.r#type {
                 account.release(amount);
             } else {
@@ -146,16 +157,23 @@ pub fn process_one(
         Chargeback => {
             let disputed_transaction =
                 get_disputed_transaction(&mut state.transactions, transaction.tx)?;
-
             let amount = disputed_transaction.amount()?;
-            account.release(amount);
+
+            // TODO: account.chargeback(amount, disputed_transaction.r#type)
+            if let Deposit = disputed_transaction.r#type {
+                account.release(amount);
+            } else {
+                account.hold(amount);
+            }
+
             match disputed_transaction.r#type {
                 Deposit => account.force_withdraw(amount),
                 Withdrawal => account.deposit(amount),
                 _ => unreachable!(),
             }
+            // end TODO
 
-            account.frozen = true;
+            account.locked = true;
         }
     }
 
