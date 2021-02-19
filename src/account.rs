@@ -23,7 +23,7 @@ fn amount_serializer<S: Serializer>(val: &i64, s: S) -> Result<S::Ok, S::Error> 
     s.serialize_str(&i64_as_money_string(*val))
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Account {
     #[serde(rename = "client")]
     pub id: u16,

@@ -4,4 +4,4 @@ mod transaction;
 
 pub use account::Account;
 pub use process::State;
-pub use transaction::Transaction;
+pub use transaction::{Transaction, TransactionType};
