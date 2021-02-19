@@ -32,7 +32,7 @@ fn money_string_to_u64(s: String) -> Result<u64, TransactionError> {
 fn amount_deserializer<'de, D: Deserializer<'de>>(d: D) -> Result<Option<u64>, D::Error> {
     let buf = String::deserialize(d)?;
 
-    if buf == "" {
+    if buf.is_empty() {
         Ok(None)
     } else {
         Ok(Some(money_string_to_u64(buf).map_err(de::Error::custom)?))
