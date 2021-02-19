@@ -38,7 +38,7 @@ pub struct Account {
     pub locked: bool,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, PartialEq, Error)]
 pub enum AccountError {
     #[error("not enough available")]
     NotEnoughAvailable,

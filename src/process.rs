@@ -23,7 +23,7 @@ impl Default for State {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(PartialEq, Debug, Error)]
 pub enum TransactionProcessingError {
     #[error("transaction already processed")]
     TransactionAlreadyProcessed,
@@ -121,12 +121,16 @@ pub fn process_one(
         }
         Withdrawal => {
             let amount = transaction.amount()?;
+            let id = transaction.tx;
             insert_if_not_exists(&mut state.transactions, transaction)?;
 
-            account.withdraw(amount)?;
-
-            // TODO if error occurred, might need to remove the inserted transaction, what if it's
-            // later chargedback?
+            let result = account.withdraw(amount);
+            if result.is_err() {
+                // if withdrawing failed, remove the transaction from the processed map so it can't
+                // be later charged back
+                state.transactions.remove(&id).unwrap();
+                result?;
+            }
         }
         Dispute => {
             let disputed_transaction =
